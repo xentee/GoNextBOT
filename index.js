@@ -45,5 +45,5 @@ client.on('messageCreate', (message) => {
 });
 
 // Connecter le bot
-const token = 'MTMzMDkwMDcxNTAyNzE2OTM0MA.GK5mKt.WzOmFXQRh-K2hub2hH66CN73asK3Q-o4yU-oi8';
+const token = '';
 client.login(token);
