@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node --no-warnings index.js",
+    "check": "node --check index.js && node --check utils/config.js && node --check utils/permissions.js && node --check utils/store.js && node --check commands/addbal.js && node --check commands/removebal.js && node --check commands/clearbal.js && node --check commands/payout.js && node --check commands/bal.js && node --check commands/balance.js && node --check commands/topbal.js && node --check commands/guide.js && node --check commands/ping.js && node --check commands/history.js && node --check commands/lastpayout.js"
   },
   "keywords": [],
   "author": "",

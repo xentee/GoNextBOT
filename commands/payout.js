@@ -1,68 +1,118 @@
-const { loadBalances, saveBalances } = require('../utils/balances');
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
+const { requireAdmin } = require('../utils/permissions');
+const { payout } = require('../utils/store');
+
+async function resolveRoleMembers(interaction) {
+    const role = interaction.options.getRole('role', true);
+
+    await interaction.guild.members.fetch();
+
+    return role.members
+        .filter(member => !member.user.bot)
+        .map(member => member);
+}
+
+function buildPayoutEmbed({ interaction, recipients, totalAmount, repairCost, targetSummary, batchId }) {
+    const afterRepairs = totalAmount - repairCost;
+    const afterTax = Math.floor(afterRepairs * 0.9);
+    const sharePerMember = Math.floor(afterTax / recipients.length);
+    const remainder = afterTax - (sharePerMember * recipients.length);
+
+    const repartition = recipients
+        .map(member => `**${member.displayName || member.tag}** : +${sharePerMember} silver`)
+        .join('\n')
+        .slice(0, 1024);
+
+    return new EmbedBuilder()
+        .setColor(0x00ff00)
+        .setTitle('PAYOUT')
+        .addFields(
+            { name: 'Cible', value: targetSummary, inline: false },
+            { name: 'Joueurs payes', value: `${recipients.length}`, inline: true },
+            { name: 'Montant total', value: `${totalAmount} silver`, inline: true },
+            { name: 'Apres reparations', value: `${afterRepairs} silver`, inline: true },
+            { name: 'Apres taxes', value: `${afterTax} silver`, inline: true },
+            { name: 'Repartition', value: repartition || 'Aucun membre', inline: false },
+            { name: 'Reste non distribue', value: `${remainder} silver`, inline: true },
+            { name: 'Audit batch', value: batchId, inline: false }
+        )
+        .setFooter({ text: `Commande par ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() });
+}
 
 module.exports = {
-    name: 'payout',
-    description: 'Distribue un montant entre les membres mentionnés après soustraction des coûts et taxes.',
-    execute(message, args) {
-        // Charger les balances
-        const balances = loadBalances();
+    data: new SlashCommandBuilder()
+        .setName('payout')
+        .setDescription('Distribue un montant a tous les membres d un role.')
+        .addIntegerOption(option => option
+            .setName('montant_total')
+            .setDescription('Montant total')
+            .setMinValue(1)
+            .setRequired(true))
+        .addIntegerOption(option => option
+            .setName('cout_reparation')
+            .setDescription('Cout de reparation')
+            .setMinValue(0)
+            .setRequired(true))
+        .addRoleOption(option => option
+            .setName('role')
+            .setDescription('Role a payer')
+            .setRequired(true)),
+    async execute(interaction) {
+        if (!await requireAdmin(interaction)) return;
 
-        // Vérification des arguments
-        if (args.length < 3) {
-            return message.reply('Utilisation : !payout <montant_total> <coût_réparation> <@membres...>');
+        const totalAmount = interaction.options.getInteger('montant_total', true);
+        const repairCost = interaction.options.getInteger('cout_reparation', true);
+        const role = interaction.options.getRole('role', true);
+
+        if (repairCost > totalAmount) {
+            return interaction.reply('Le montant total est insuffisant pour couvrir les couts de reparation.');
         }
 
-        const totalAmount = parseInt(args[0], 10);
-        const repairCost = parseInt(args[1], 10);
-        const members = message.mentions.members;
+        let recipients;
+        const targetSummary = `@${role.name}`;
+        await interaction.deferReply();
 
-        // Valider les montants et les membres
-        if (isNaN(totalAmount) || totalAmount <= 0) {
-            return message.reply('Le montant total doit être un nombre positif.');
-        }
-        if (isNaN(repairCost) || repairCost < 0) {
-            return message.reply('Le coût de réparation doit être un nombre positif ou nul.');
-        }
-        if (!members.size) {
-            return message.reply('Vous devez mentionner au moins un membre.');
+        try {
+            recipients = await resolveRoleMembers(interaction);
+        } catch (error) {
+            console.error(error);
+            return interaction.editReply("Impossible de recuperer les membres du role. Verifiez que le Server Members Intent est active dans le Discord Developer Portal.");
         }
 
-        // Calcul des valeurs
+        if (recipients.length === 0) {
+            return interaction.editReply('Aucun joueur valide a payer dans ce role.');
+        }
+
         const afterRepairs = totalAmount - repairCost;
-        if (afterRepairs < 0) {
-            return message.reply('Le montant total est insuffisant pour couvrir les coûts de réparation.');
-        }
+        const afterTax = Math.floor(afterRepairs * 0.9);
+        const sharePerMember = Math.floor(afterTax / recipients.length);
+        const remainder = afterTax - (sharePerMember * recipients.length);
+        const metadata = {
+            totalAmount,
+            repairCost,
+            afterRepairs,
+            afterTax,
+            sharePerMember,
+            remainder,
+            target: targetSummary,
+        };
 
-        const afterTax = afterRepairs * 0.9; // 10% de taxe
-        const sharePerMember = Math.floor(afterTax / members.size);
-
-        // Mettre à jour les balances des membres
-        members.forEach(member => {
-            balances[member.id] = (balances[member.id] || 0) + sharePerMember;
+        const batchId = payout({
+            actorId: interaction.user.id,
+            recipients,
+            sharePerMember,
+            metadata,
         });
 
-        // Sauvegarder les balances mises à jour
-        saveBalances(balances);
+        const embed = buildPayoutEmbed({
+            interaction,
+            recipients,
+            totalAmount,
+            repairCost,
+            targetSummary,
+            batchId,
+        });
 
-        // Créer un embed sans description
-        const embed = new EmbedBuilder()
-            .setColor(0x00ff00)
-            .setTitle('**PAYOUT**')
-            .addFields(
-                { name: 'Montant total', value: `${totalAmount} silver`, inline: true },
-                { name: 'Après réparations', value: `${afterRepairs} silver`, inline: true },
-                { name: 'Après taxes', value: `${Math.floor(afterTax)} silver`, inline: true },
-                {
-                    name: 'Répartition',
-                    value: members
-                        .map(member => `**${member.displayName}** : +${sharePerMember} silver`)
-                        .join('\n'),
-                }
-            )
-            .setFooter({ text: `Commandé par ${message.author.tag}`, iconURL: message.author.displayAvatarURL() });
-
-        // Envoyer l'embed
-        message.channel.send({ embeds: [embed] });
+        await interaction.editReply({ embeds: [embed] });
     },
 };

@@ -1,32 +1,41 @@
+const { SlashCommandBuilder } = require('discord.js');
+
 module.exports = {
-    name: 'guide',
-    description: 'Affiche le guide des commandes disponibles',
-    execute(message) {
+    data: new SlashCommandBuilder()
+        .setName('guide')
+        .setDescription('Affiche le guide des commandes disponibles.'),
+    async execute(interaction) {
         const guide = `
-**Guide d'utilisation du Bot**
-\`!payout <montant_total> <coût_réparation> <@membres...>\`
-Distribue le montant total spécifié entre les membres mentionnés après déduction des coûts de réparation et des taxes. (Maître de Guilde, Bras droit, Officier, Banquier uniquement)
+**Guide d'utilisation du bot**
 
-\`!balance <@membre>\`
-Affiche la balance du membre mentionné.
+\`/bal\`
+Affiche votre balance.
 
-\`!bal\`
-Affiche votre propre balance.
+\`/balance membre:@membre\`
+Affiche la balance du membre selectionne.
 
-\`!addbal <@membre> <montant>\`
-Ajoute le montant spécifié à la balance du membre mentionné. (Maître de Guilde, Bras droit, Officier, Banquier uniquement)
-
-\`!removebal <@membre> <montant>\`
-Retire le montant spécifié de la balance du membre mentionné, s'il a assez de solde. (Maître de Guilde, Bras droit, Officier, Banquier uniquement)
-
-\`!clearbal <@membre>\`
-Réinitialise la balance du membre mentionné. (Maître de Guilde, Bras droit, Officier, Banquier uniquement)
-
-\`!topbal\`
+\`/topbal\`
 Affiche le classement des 10 plus grosses balances.
 
+\`/addbal membre:@membre montant:100\`
+Ajoute un montant a la balance du membre.
 
-        `;
-        message.channel.send(guide);
+\`/removebal membre:@membre montant:50\`
+Retire un montant de la balance du membre.
+
+\`/clearbal membre:@membre\`
+Reinitialise la balance du membre.
+
+\`/payout montant_total:1000 cout_reparation:200 role:@Joueurs\`
+Distribue le montant a tous les membres du role.
+
+\`/history membre:@membre\`
+Affiche l'historique pagine des transactions du membre avec l'auteur de chaque ligne. Admin uniquement.
+
+\`/lastpayout\`
+Affiche le dernier payout. Admin uniquement.
+`;
+
+        await interaction.reply({ content: guide, ephemeral: true });
     },
 };

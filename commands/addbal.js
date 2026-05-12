@@ -1,25 +1,34 @@
-const { loadBalances, saveBalances } = require('../utils/balances');
+const { SlashCommandBuilder } = require('discord.js');
+const { requireAdmin } = require('../utils/permissions');
+const { addBalance } = require('../utils/store');
 
 module.exports = {
-    name: 'addbal',
-    description: 'Ajoute un montant à la balance d’un membre mentionné.',
-    execute(message, args) {
-        const balances = loadBalances();
+    data: new SlashCommandBuilder()
+        .setName('addbal')
+        .setDescription("Ajoute un montant a la balance d'un membre.")
+        .addUserOption(option => option
+            .setName('membre')
+            .setDescription('Membre a crediter')
+            .setRequired(true))
+        .addIntegerOption(option => option
+            .setName('montant')
+            .setDescription('Montant a ajouter')
+            .setMinValue(1)
+            .setRequired(true)),
+    async execute(interaction) {
+        if (!await requireAdmin(interaction)) return;
 
-        if (args.length < 2) {
-            return message.reply('Utilisation : !addbal <@membre> <montant>');
-        }
+        const user = interaction.options.getUser('membre', true);
+        const member = interaction.options.getMember('membre');
+        const amount = interaction.options.getInteger('montant', true);
+        const nextBalance = addBalance({
+            userId: user.id,
+            amount,
+            actorId: interaction.user.id,
+            type: 'addbal',
+        });
 
-        const member = message.mentions.members.first();
-        const amount = parseInt(args[1], 10);
-
-        if (!member || isNaN(amount)) {
-            return message.reply('Membre ou montant invalide.');
-        }
-
-        balances[member.id] = (balances[member.id] || 0) + amount;
-        saveBalances(balances);
-
-        message.reply(`Ajouté ${amount} silver à la balance de ${member.displayName}.`);
+        await interaction.reply(`Ajoute ${amount} silvers a la balance de ${member?.displayName || user.tag}. Nouveau solde : ${nextBalance} silvers.`);
     },
 };
+

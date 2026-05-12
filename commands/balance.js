@@ -1,39 +1,29 @@
-const { loadBalances } = require('../utils/balances');
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
+const { getBalance } = require('../utils/store');
 
 module.exports = {
-    name: 'balance',
-    description: 'Affiche la balance d’un membre mentionné.',
-    execute(message, args) {
-        // Charger les balances
-        const balances = loadBalances();
+    data: new SlashCommandBuilder()
+        .setName('balance')
+        .setDescription("Affiche la balance d'un membre.")
+        .addUserOption(option => option
+            .setName('membre')
+            .setDescription('Membre a consulter')
+            .setRequired(true)),
+    async execute(interaction) {
+        const user = interaction.options.getUser('membre', true);
+        const member = interaction.options.getMember('membre');
+        const balance = getBalance(user.id);
 
-        // Vérifier si un membre est mentionné
-        if (args.length === 0) {
-            return message.reply('Utilisation : !balance <@membre>');
-        }
-
-        const member = message.mentions.members.first();
-
-        // Vérifier si le membre mentionné existe
-        if (!member) {
-            return message.reply('Vous devez mentionner un membre valide.');
-        }
-
-        // Récupérer la balance du membre
-        const balance = balances[member.id] || 0;
-
-        // Créer un embed pour afficher la balance
         const embed = new EmbedBuilder()
             .setColor(0x3498db)
             .setTitle('Consultation de balance')
             .addFields(
-                { name: 'Membre', value: `${member.displayName}`, inline: true },
+                { name: 'Membre', value: member?.displayName || user.tag, inline: true },
                 { name: 'Balance', value: `${balance} silver`, inline: true }
             )
-            .setFooter({ text: `Consulté par ${message.author.tag}`, iconURL: message.author.displayAvatarURL() });
+            .setFooter({ text: `Consulte par ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() });
 
-        // Envoyer l'embed
-        message.channel.send({ embeds: [embed] });
+        await interaction.reply({ embeds: [embed] });
     },
 };
+

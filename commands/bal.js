@@ -1,12 +1,13 @@
-const { loadBalances } = require('../utils/balances');
+const { SlashCommandBuilder } = require('discord.js');
+const { getBalance } = require('../utils/store');
 
 module.exports = {
-    name: 'bal',
-    description: 'Affiche votre propre balance.',
-    execute(message) {
-        const balances = loadBalances();
-
-        const balance = balances[message.author.id] || 0;
-        message.reply(`Vous avez une balance de ${balance} silvers.`);
+    data: new SlashCommandBuilder()
+        .setName('bal')
+        .setDescription('Affiche votre balance.'),
+    async execute(interaction) {
+        const balance = getBalance(interaction.user.id);
+        await interaction.reply(`Vous avez une balance de ${balance} silvers.`);
     },
 };
+

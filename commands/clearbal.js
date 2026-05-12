@@ -1,29 +1,26 @@
-const { loadBalances, saveBalances } = require('../utils/balances');
+const { SlashCommandBuilder } = require('discord.js');
+const { requireAdmin } = require('../utils/permissions');
+const { clearBalance } = require('../utils/store');
 
 module.exports = {
-    name: 'clearbal',
-    description: 'Réinitialise la balance d’un membre mentionné.',
-    execute(message, args) {
-        // Charger les balances
-        const balances = loadBalances();
+    data: new SlashCommandBuilder()
+        .setName('clearbal')
+        .setDescription("Reinitialise la balance d'un membre.")
+        .addUserOption(option => option
+            .setName('membre')
+            .setDescription('Membre a reinitialiser')
+            .setRequired(true)),
+    async execute(interaction) {
+        if (!await requireAdmin(interaction)) return;
 
-        // Vérifier les arguments
-        if (args.length < 1) {
-            return message.reply('Utilisation : !clearbal <@membre>');
-        }
+        const user = interaction.options.getUser('membre', true);
+        const member = interaction.options.getMember('membre');
 
-        const member = message.mentions.members.first();
+        clearBalance({
+            userId: user.id,
+            actorId: interaction.user.id,
+        });
 
-        // Valider le membre
-        if (!member) {
-            return message.reply('Vous devez mentionner un membre valide.');
-        }
-
-        // Réinitialiser la balance
-        balances[member.id] = 0;
-        saveBalances(balances);
-
-        // Répondre à l'utilisateur
-        message.reply(`La balance de ${member.displayName} a été réinitialisée à 0 silver.`);
+        await interaction.reply(`La balance de ${member?.displayName || user.tag} a ete reinitialisee a 0 silver.`);
     },
 };

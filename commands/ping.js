@@ -1,7 +1,13 @@
+const { SlashCommandBuilder } = require('discord.js');
+const { requireAdmin } = require('../utils/permissions');
+
 module.exports = {
-    name: 'ping', // Nom de la commande
-    description: 'Répond avec Pong!', // Description
-    execute(message, args) {
-        message.reply('Pong ! 🏓');
+    data: new SlashCommandBuilder()
+        .setName('ping')
+        .setDescription('Verifie que le bot repond.'),
+    async execute(interaction) {
+        if (!await requireAdmin(interaction)) return;
+
+        await interaction.reply('Pong !');
     },
 };

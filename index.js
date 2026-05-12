@@ -1,49 +1,88 @@
 const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const fs = require('fs');
+const path = require('path');
+const { token, guildId } = require('./utils/config');
+const { initDatabase } = require('./utils/store');
 
-// Créer une instance du client
+initDatabase();
+
 const client = new Client({
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMembers,
+    ],
 });
 
-// Définir le préfixe
-const prefix = '!';
-
-// Charger les commandes dynamiquement
 client.commands = new Collection();
-const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
+const commandsPath = path.join(__dirname, 'commands');
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
 for (const file of commandFiles) {
-    const command = require(`./commands/${file}`);
-    client.commands.set(command.name, command);
+    const command = require(path.join(commandsPath, file));
+    client.commands.set(command.data.name, command);
 }
 
-// Quand le bot est prêt
-client.once('ready', () => {
-    console.log(`Bot connecté en tant que ${client.user.tag}`);
-});
+async function registerCommands() {
+    const commandData = client.commands.map(command => command.data.toJSON());
 
-// Réagir aux messages
-client.on('messageCreate', (message) => {
-    // Ignorer les messages qui ne sont pas des commandes ou sont envoyés par un bot
-    if (message.author.bot || !message.content.startsWith(prefix)) return;
+    if (guildId) {
+        const guild = await client.guilds.fetch(guildId);
+        await guild.commands.set(commandData);
+        await client.application.commands.set([]);
+        console.log(`Slash commands enregistrees pour le serveur ${guildId}: ${client.commands.map(command => command.data.name).join(', ')}`);
+        console.log('Slash commands globales nettoyees pour eviter les doublons.');
+        return;
+    }
 
-    // Extraire la commande et les arguments
-    const args = message.content.slice(prefix.length).trim().split(/ +/);
-    const commandName = args.shift().toLowerCase();
+    await client.application.commands.set(commandData);
+    console.log(`Slash commands globales enregistrees: ${client.commands.map(command => command.data.name).join(', ')}`);
+    console.log('Conseil dev: definis DISCORD_GUILD_ID dans .env pour enregistrer les commandes instantanement sur ton serveur.');
+}
 
-    // Trouver la commande correspondante
-    const command = client.commands.get(commandName);
-    if (!command) return; 
+client.once('ready', async () => {
+    console.log(`Bot connecte en tant que ${client.user.tag}`);
 
     try {
-        command.execute(message, args);
+        await registerCommands();
     } catch (error) {
-        console.error(error);
-        message.reply('Une erreur est survenue lors de l’exécution de la commande.');
+        console.error('Impossible d enregistrer les slash commands:', error);
     }
 });
 
-// Connecter le bot
-const token = '';
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isChatInputCommand()) return;
+
+    console.log(`Commande recue: /${interaction.commandName} par ${interaction.user.tag}`);
+
+    const command = client.commands.get(interaction.commandName);
+    if (!command) {
+        await interaction.reply({
+            content: 'Commande inconnue par le bot. Redemarre le bot pour resynchroniser les commandes.',
+            ephemeral: true,
+        });
+        return;
+    }
+
+    try {
+        await command.execute(interaction);
+    } catch (error) {
+        console.error(error);
+
+        const response = {
+            content: "Une erreur est survenue lors de l'execution de la commande.",
+            ephemeral: true,
+        };
+
+        if (interaction.replied || interaction.deferred) {
+            await interaction.followUp(response);
+        } else {
+            await interaction.reply(response);
+        }
+    }
+});
+
+process.on('unhandledRejection', error => {
+    console.error('Unhandled promise rejection:', error);
+});
+
 client.login(token);

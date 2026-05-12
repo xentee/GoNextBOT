@@ -1,75 +1,90 @@
 # GoNextBOT
 
-## Commandes disponibles
+Bot Discord de gestion de balances en silvers.
 
-### 🎯 Général
-#### `!guide`
-- **Description** : Affiche le guide d'utilisation de toutes les commandes du bot.
-- **Usage** : `!guide`
-- **Permissions** : Aucune.
+## Installation
 
----
+```bash
+npm install
+```
 
-### 💰 Gestion des Balances
-#### `!bal`
-- **Description** : Consulte votre propre balance.
-- **Usage** : `!bal`
-- **Permissions** : Aucune.
+Copiez `.env.example` vers `.env`, puis renseignez :
 
-#### `!balance <@membre>`
-- **Description** : Consulte la balance d'un membre mentionné.
-- **Usage** : `!balance <@membre>`
-- **Exemple** : `!balance @MembreExemple`
-- **Permissions** : Aucune.
+```env
+DISCORD_TOKEN=your_discord_bot_token_here
+DISCORD_GUILD_ID=
+ADMIN_ROLE_IDS=
+ADMIN_ROLE_NAMES=Admin
+```
 
-#### `!topbal`
-- **Description** : Affiche les 10 membres ayant les plus grosses balances.
-- **Usage** : `!topbal`
-- **Permissions** : Aucune.
+`DISCORD_GUILD_ID` est optionnel, mais recommande pendant le developpement : les slash commands apparaissent instantanement sur ce serveur. Sans lui, elles sont enregistrees globalement et peuvent mettre du temps a apparaitre.
 
----
+Dans le Discord Developer Portal, activez :
 
-### 📋 Commandes Administratives
-Ces commandes nécessitent un rôle spécifique pour être utilisées.
+- Server Members Intent, pour payer tous les membres d'un role avec `/payout`.
 
-#### `!addbal <@membre> <montant>`
-- **Description** : Ajoute un montant à la balance d'un membre mentionné.
-- **Usage** : `!addbal <@membre> <montant>`
-- **Exemple** : `!addbal @MembreExemple 100`
-- **Permissions** : Rôle `Admin` ou identifiant de rôle configuré.
+`Message Content Intent` n'est plus necessaire, car le bot utilise des slash commands.
 
-#### `!removebal <@membre> <montant>`
-- **Description** : Retire un montant à la balance d'un membre mentionné.
-- **Usage** : `!removebal <@membre> <montant>`
-- **Exemple** : `!removebal @MembreExemple 50`
-- **Permissions** : Rôle `Admin` ou identifiant de rôle configuré.
+Pour inviter le bot, l'URL OAuth2 doit inclure ces scopes :
 
-#### `!clearbal <@membre>`
-- **Description** : Réinitialise la balance d'un membre mentionné à 0.
-- **Usage** : `!clearbal <@membre>`
-- **Exemple** : `!clearbal @MembreExemple`
-- **Permissions** : Rôle `Admin` ou identifiant de rôle configuré.
+- `bot`
+- `applications.commands`
 
-#### `!payout <montant_total> <coût_réparation> <@membres...>`
-- **Description** : Distribue un montant total entre plusieurs membres après soustraction des coûts de réparation et d'une taxe de 10 %.
-- **Usage** : `!payout <montant_total> <coût_réparation> <@membres...>`
-- **Exemple** : `!payout 1000 200 @Membre1 @Membre2`
-- **Détails** :
-  - Le montant restant est divisé également entre tous les membres mentionnés.
-- **Permissions** : Rôle `Admin` ou identifiant de rôle configuré.
+## Demarrage
 
----
+```bash
+npm start
+```
 
-## Permissions et restrictions
+Au demarrage, le bot enregistre automatiquement les slash commands.
 
-Certaines commandes sont réservées aux membres ayant des rôles spécifiques. Voici les rôles nécessaires pour chaque commande administrative :
+## Commandes
 
-- **Commandes nécessitant un rôle spécifique** :
-  - `!addbal`, `!removebal`, `!clearbal`, et `!payout` : Rôle **Admin** (ou équivalent configuré par l'identifiant de rôle dans le code).
+### General
 
----
+#### `/guide`
+Affiche le guide des commandes.
 
-## Notes techniques
-- Les balances sont sauvegardées de manière persistante dans un fichier ou une base de données.
-- Les calculs pour les taxes et répartitions sont réalisés automatiquement.
-- Les membres doivent être mentionnés correctement pour certaines commandes (ex. : `@MembreExemple`).
+#### `/ping`
+Verifie que le bot repond. Necessite les permissions admin du bot.
+
+### Balances
+
+#### `/bal`
+Affiche votre balance.
+
+#### `/balance membre:@membre`
+Affiche la balance du membre selectionne.
+
+#### `/topbal`
+Affiche les 10 plus grosses balances.
+
+### Administration
+
+Ces commandes demandent un role configure dans `ADMIN_ROLE_IDS`, `ADMIN_ROLE_NAMES`, ou la permission Discord `Administrator`.
+
+#### `/addbal membre:@membre montant:100`
+Ajoute un montant a la balance du membre.
+
+#### `/removebal membre:@membre montant:50`
+Retire un montant de la balance du membre si son solde le permet.
+
+#### `/clearbal membre:@membre`
+Reinitialise la balance du membre a 0.
+
+#### `/payout montant_total:1000 cout_reparation:200 role:@Joueurs`
+Distribue le montant a tous les membres non-bots du role.
+
+### Audit
+
+Ces commandes demandent aussi les permissions admin du bot.
+
+#### `/history membre:@membre`
+Affiche l'historique pagine d'un membre avec boutons precedent/suivant. Chaque ligne indique aussi qui a realise la transaction.
+
+#### `/lastpayout`
+Affiche le dernier payout enregistre.
+
+## Stockage
+
+Les balances et transactions sont stockees dans `data.sqlite`. Au premier demarrage, si la base est vide, le bot importe automatiquement les soldes presents dans `balances.json`.

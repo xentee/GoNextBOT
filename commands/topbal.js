@@ -1,42 +1,45 @@
-const { loadBalances } = require('../utils/balances');
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
+const { getTopBalances } = require('../utils/store');
 
 module.exports = {
-    name: 'topbal',
-    description: '**Classement des 10 plus grosses balances**',
-    execute(message) {
-        // Charger les balances
-        const balances = loadBalances();
+    data: new SlashCommandBuilder()
+        .setName('topbal')
+        .setDescription('Affiche les 10 plus grosses balances.'),
+    async execute(interaction) {
+        const topBalances = getTopBalances(10);
 
-        // Convertir les balances en un tableau trié
-        const sortedBalances = Object.entries(balances)
-            .sort(([, a], [, b]) => b - a) // Trier par valeur décroissante
-            .slice(0, 10); // Prendre les 10 premières
-
-        // Vérifier si des données existent
-        if (sortedBalances.length === 0) {
-            return message.reply("Aucune balance enregistrée pour le moment.");
+        if (topBalances.length === 0) {
+            return interaction.reply('Aucune balance enregistree pour le moment.');
         }
 
-        // Construire les champs pour l'embed
-        const fields = sortedBalances.map(([userId, balance], index) => {
-            const user = message.guild.members.cache.get(userId);
-            const username = user ? user.displayName : `Utilisateur inconnu (${userId})`;
+        const fields = await Promise.all(topBalances.map(async (row, index) => {
+            let username = `Utilisateur inconnu (${row.user_id})`;
+
+            try {
+                const member = await interaction.guild.members.fetch(row.user_id);
+                username = member.displayName;
+            } catch {
+                try {
+                    const user = await interaction.client.users.fetch(row.user_id);
+                    username = user.tag;
+                } catch {
+                    // Keep fallback.
+                }
+            }
+
             return {
                 name: `#${index + 1} - ${username}`,
-                value: `${balance} silvers`,
+                value: `${row.balance} silvers`,
                 inline: false,
             };
-        });
+        }));
 
-        // Créer un embed pour afficher les top balances
         const embed = new EmbedBuilder()
             .setColor(0xffd700)
             .setTitle('TOP 10 BALANCES')
             .addFields(fields)
-            .setFooter({ text: `Demandé par ${message.author.tag}`, iconURL: message.author.displayAvatarURL() });
+            .setFooter({ text: `Demande par ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() });
 
-        // Envoyer l'embed
-        message.channel.send({ embeds: [embed] });
+        await interaction.reply({ embeds: [embed] });
     },
 };
